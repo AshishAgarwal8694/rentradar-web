@@ -113,7 +113,7 @@ export default function LandingPage() {
               {l}
             </a>
           ))}
-          <Link href="/dashboard" style={{
+          <Link href="/login" style={{
             background: 'var(--green)', color: 'var(--bg)',
             padding: '8px 18px', borderRadius: '8px',
             fontSize: '14px', fontWeight: 600, textDecoration: 'none',

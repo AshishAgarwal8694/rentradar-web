@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '../../utils/supabase'
 
 const MOCK_ALERTS = [
   { id: 1, name: 'Inner West', suburbs: 'Newtown, Leichhardt', price: '$750/wk', beds: 2, newCount: 4 },
@@ -15,6 +17,16 @@ const MOCK_LISTINGS = [
 
 export default function Dashboard() {
   const [saved, setSaved] = useState([])
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) router.push('/login')
+    }
+    checkUser()
+  }, [])
 
   const toggleSave = (id) => {
     setSaved(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
