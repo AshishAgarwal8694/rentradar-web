@@ -2,30 +2,101 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '../../utils/supabase'
 
-const PROPERTY_TYPES = ['Any', 'Apartment', 'House', 'Townhouse', 'Studio']
+const PROPERTY_TYPES  = ['Any', 'Apartment', 'House', 'Townhouse', 'Studio']
 const BEDROOM_OPTIONS = ['Any', '1', '2', '3', '4+']
 const NOTIFY_OPTIONS  = [
-  { id: 'instant', label: 'Instantly',    sub: 'Every 10 minutes',   icon: '⚡' },
-  { id: 'hourly',  label: 'Hourly',       sub: 'Once per hour',      icon: '🕐' },
-  { id: 'daily',   label: 'Daily digest', sub: 'Once per day 8am',   icon: '📅' },
+  { id: 'instant', label: 'Instantly',    sub: 'Every 10 minutes', icon: '⚡' },
+  { id: 'hourly',  label: 'Hourly',       sub: 'Once per hour',    icon: '🕐' },
+  { id: 'daily',   label: 'Daily digest', sub: 'Once per day 8am', icon: '📅' },
 ]
 
-export default function CreateAlert() {
-  const router = useRouter()
-  const [form, setForm] = useState({
-    name:       '',
-    suburb:     '',
-    maxPrice:   600,
-    beds:       'Any',
-    propType:   'Any',
-    notify:     'instant',
-  })
-  const [saved, setSaved] = useState(false)
+const SUBURB_POSTCODES = {
+  'newtown':      '2042',
+  'surry hills':  '2010',
+  'leichhardt':   '2040',
+  'glebe':        '2037',
+  'balmain':      '2041',
+  'marrickville': '2204',
+  'erskineville': '2043',
+  'annandale':    '2038',
+  'rozelle':      '2039',
+  'pyrmont':      '2009',
+  'ultimo':       '2007',
+  'chippendale':  '2008',
+  'redfern':      '2016',
+  'waterloo':     '2017',
+  'zetland':      '2017',
+  'alexandria':   '2015',
+  'crows nest':   '2065',
+  'st leonards':  '2065',
+  'neutral bay':  '2089',
+  'mosman':       '2088',
+  'manly':        '2095',
+  'bondi':        '2026',
+  'bondi junction': '2022',
+  'randwick':     '2031',
+  'coogee':       '2034',
+  'maroubra':     '2035',
+  'parramatta':   '2150',
+  'chatswood':    '2067',
+  'north sydney': '2060',
+}
 
-  const handleSave = () => {
-    setSaved(true)
-    setTimeout(() => router.push('/dashboard'), 1500)
+function getPostcode(suburb) {
+  return SUBURB_POSTCODES[suburb.toLowerCase().trim()] || '2000'
+}
+
+export default function CreateAlert() {
+  const router   = useRouter()
+  const supabase = createClient()
+
+  const [form, setForm] = useState({
+    name:      '',
+    suburbs:   '',
+    maxPrice:  600,
+    beds:      'Any',
+    propType:  'Any',
+    notify:    'instant',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError('')
+
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    // Parse suburbs input into array
+    const suburbList   = form.suburbs.split(',').map(s => s.trim()).filter(Boolean)
+    const postcodeList = suburbList.map(s => getPostcode(s))
+
+    if (!form.name) { setError('Please enter an alert name'); setSaving(false); return }
+    if (suburbList.length === 0) { setError('Please enter at least one suburb'); setSaving(false); return }
+
+    // Save to Supabase
+    const { error: dbError } = await supabase.from('alerts').insert({
+      user_id:       user.id,
+      name:          form.name,
+      suburbs:       suburbList,
+      postcodes:     postcodeList,
+      max_price:     form.maxPrice,
+      min_bedrooms:  form.beds,
+      property_type: form.propType,
+      notify_freq:   form.notify,
+    })
+
+    if (dbError) {
+      setError(dbError.message)
+      setSaving(false)
+      return
+    }
+
+    router.push('/dashboard')
   }
 
   return (
@@ -34,11 +105,11 @@ export default function CreateAlert() {
       {/* Sidebar */}
       <aside style={{
         width: '220px', flexShrink: 0,
-        background: 'var(--bg2)', borderRight: '1px solid var(--border)',
+        background: '#0f1419', borderRight: '1px solid #1e2d3d',
         display: 'flex', flexDirection: 'column',
         padding: '24px 0', position: 'fixed', top: 0, bottom: 0,
       }}>
-        <div style={{ padding: '0 20px 24px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '0 20px 24px', borderBottom: '1px solid #1e2d3d' }}>
           <Link href="/" style={{ fontFamily: 'var(--font-head)', fontSize: '18px', fontWeight: 700, color: 'var(--green)', textDecoration: 'none' }}>
             Rent<span style={{ color: 'var(--text)' }}>Radar</span>
           </Link>
@@ -54,7 +125,6 @@ export default function CreateAlert() {
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '10px 12px', borderRadius: '8px', marginBottom: '4px',
               color: 'var(--muted)', fontSize: '14px', textDecoration: 'none',
-              transition: 'all 0.15s',
             }}>
               <span>{item.icon}</span>{item.label}
             </Link>
@@ -69,7 +139,7 @@ export default function CreateAlert() {
             ← Back to dashboard
           </Link>
           <h1 style={{ fontFamily: 'var(--font-head)', fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px' }}>New alert</h1>
-          <p style={{ color: 'var(--muted)', fontSize: '14px', marginTop: '6px' }}>Set your search criteria and we'll watch 24/7.</p>
+          <p style={{ color: 'var(--muted)', fontSize: '14px', marginTop: '6px' }}>Set your search criteria and well watch 24/7.</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -77,29 +147,20 @@ export default function CreateAlert() {
           {/* Alert name */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px' }}>
             <label style={{ display: 'block', fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Alert name</label>
-            <input
-              value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. Inner West search"
-              style={{
-                width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
-                borderRadius: '10px', padding: '12px 16px', color: 'var(--text)',
-                fontSize: '15px', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box',
-              }}
+              style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 16px', color: 'var(--text)', fontSize: '15px', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box' }}
             />
           </div>
 
-          {/* Suburb */}
+          {/* Suburbs */}
           <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px' }}>
-            <label style={{ display: 'block', fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Suburb</label>
-            <input
-              value={form.suburb} onChange={e => setForm({ ...form, suburb: e.target.value })}
+            <label style={{ display: 'block', fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>Suburbs</label>
+            <input value={form.suburbs} onChange={e => setForm({ ...form, suburbs: e.target.value })}
               placeholder="e.g. Newtown, Surry Hills, Leichhardt"
-              style={{
-                width: '100%', background: 'var(--bg)', border: '1px solid var(--border)',
-                borderRadius: '10px', padding: '12px 16px', color: 'var(--text)',
-                fontSize: '15px', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box',
-              }}
+              style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 16px', color: 'var(--text)', fontSize: '15px', fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box' }}
             />
+            <p style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '8px' }}>Separate multiple suburbs with commas</p>
           </div>
 
           {/* Max price */}
@@ -127,8 +188,7 @@ export default function CreateAlert() {
                   border: form.beds === opt ? '1px solid var(--green)' : '1px solid var(--border)',
                   background: form.beds === opt ? 'rgba(168,240,198,0.1)' : 'var(--bg)',
                   color: form.beds === opt ? 'var(--green)' : 'var(--muted)',
-                  fontSize: '14px', fontFamily: 'var(--font-body)',
-                  transition: 'all 0.15s',
+                  fontSize: '14px', fontFamily: 'var(--font-body)', transition: 'all 0.15s',
                 }}>
                   {opt}
                 </button>
@@ -146,8 +206,7 @@ export default function CreateAlert() {
                   border: form.propType === opt ? '1px solid var(--green)' : '1px solid var(--border)',
                   background: form.propType === opt ? 'rgba(168,240,198,0.1)' : 'var(--bg)',
                   color: form.propType === opt ? 'var(--green)' : 'var(--muted)',
-                  fontSize: '14px', fontFamily: 'var(--font-body)',
-                  transition: 'all 0.15s',
+                  fontSize: '14px', fontFamily: 'var(--font-body)', transition: 'all 0.15s',
                 }}>
                   {opt}
                 </button>
@@ -174,16 +233,24 @@ export default function CreateAlert() {
             </div>
           </div>
 
+          {/* Error */}
+          {error && (
+            <div style={{
+              background: 'rgba(255,80,80,0.1)', border: '1px solid rgba(255,80,80,0.3)',
+              borderRadius: '8px', padding: '12px 16px', color: '#ff8080', fontSize: '14px',
+            }}>
+              {error}
+            </div>
+          )}
+
           {/* Save button */}
-          <button onClick={handleSave} style={{
-            width: '100%', background: saved ? 'rgba(168,240,198,0.2)' : 'var(--green)',
-            color: saved ? 'var(--green)' : 'var(--bg)',
-            border: saved ? '1px solid var(--green)' : 'none',
-            borderRadius: '14px', padding: '16px',
-            fontSize: '16px', fontWeight: 700, cursor: 'pointer',
-            fontFamily: 'var(--font-head)', transition: 'all 0.3s',
+          <button onClick={handleSave} disabled={saving} style={{
+            width: '100%', background: 'var(--green)', color: 'var(--bg)',
+            border: 'none', borderRadius: '14px', padding: '16px',
+            fontSize: '16px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer',
+            fontFamily: 'var(--font-head)', opacity: saving ? 0.7 : 1, transition: 'all 0.3s',
           }}>
-            {saved ? '✓ Alert saved! Redirecting...' : 'Save alert'}
+            {saving ? 'Saving...' : 'Save alert →'}
           </button>
 
         </div>
