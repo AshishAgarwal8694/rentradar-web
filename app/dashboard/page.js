@@ -79,6 +79,19 @@ export default function Dashboard() {
           }}>
             + New alert
           </Link>
+          <button onClick={async () => {
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            router.push('/login')
+          }} style={{
+            width: '100%', marginTop: '8px',
+            background: 'transparent', border: '1px solid var(--border)',
+            borderRadius: '8px', padding: '10px',
+            fontSize: '13px', color: 'var(--muted)',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}>
+            Sign out
+          </button>
         </div>
       </aside>
 
