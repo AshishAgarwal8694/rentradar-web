@@ -1,7 +1,7 @@
 'use client'
-import { useState } from 'react'
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '../../utils/supabase'
 
 const MOCK_ALERTS = [
@@ -17,11 +17,11 @@ const MOCK_LISTINGS = [
 
 export default function Dashboard() {
   const [saved, setSaved] = useState([])
-
-  const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     const checkUser = async () => {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) router.push('/login')
     }
